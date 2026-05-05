@@ -27,8 +27,12 @@ export function handlerMove(gs: GameState, ch: ConfirmChannel): (move: ArmyMove)
                 attacker: move.player,
                 defender: gs.getPlayerSnap(),
             };
-            await publishJSON(ch, ExchangePerilTopic, `${WarRecognitionsPrefix}.${gs.getUsername()}`, rw);
-            return AckType.NackRequeue;
+            try {
+                await publishJSON(ch, ExchangePerilTopic, `${WarRecognitionsPrefix}.${gs.getUsername()}`, rw);
+            } catch (err) {
+                return AckType.NackRequeue;
+            }
+            return AckType.Ack;
         }
         else {
             return AckType.NackDiscard;
