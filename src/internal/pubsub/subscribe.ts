@@ -35,7 +35,8 @@ export async function subscribe<T>(
     deserializer: (data: Buffer) => T,
 ): Promise<void> {
     const ch = await declareAndBind(conn, exchange, queueName, routingKey, simpleQueueType);
-    const consumed = await ch[0].consume(ch[1].queue, onMessage); // No nullchecks; we die like men
+    await ch[0].prefetch(1);
+    await ch[0].consume(ch[1].queue, onMessage); // No nullchecks; we die like men
 
     async function onMessage(msg: ConsumeMessage | null): Promise<void> {
         if (msg == null) {

@@ -1,5 +1,5 @@
 import amqp, { type ConfirmChannel, type Message } from "amqplib";
-import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
+import { clientWelcome, commandStatus, getInput, getMaliciousLog, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
 import { ArmyMovesPrefix, ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
@@ -67,7 +67,18 @@ async function main() {
           printClientHelp();
         }
         else if (action == "spam") {
-          console.log("No spamming allowed yet!");
+          if (input.length > 1) {
+            const spamCount = parseInt(input[1] as string);
+            for (let i = 0; i < spamCount; i++) {
+              const malMsg = getMaliciousLog();
+              const gameLog = {
+                username: gameState.getUsername(),
+                message: malMsg,
+                currentTime: Date.now()
+              };
+              await publishMsgPack(ch, ExchangePerilTopic, `${GameLogSlug}.${username}`, gameLog);
+            }
+          }
         }
         else if (action == "quit") {
           printQuit();
@@ -94,7 +105,7 @@ export async function publishGameLog(ch: ConfirmChannel, username: string, messa
   const gameLog = {
     username: username,
     message: message,
-    currentTime: new Date(Date.now())
+    currentTime: Date.now()
   };
   await publishMsgPack(ch, ExchangePerilTopic, `${GameLogSlug}.${username}`, gameLog);
 }
