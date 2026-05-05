@@ -7,6 +7,7 @@ import { AckType } from "../internal/pubsub/acktype.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
 import { ExchangePerilTopic, WarRecognitionsPrefix } from "../internal/routing/routing.js";
 import { handleWar, WarOutcome } from "../internal/gamelogic/war.js";
+import { publishGameLog } from "./index.js";
 
 export function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
     return (ps) => {
@@ -40,24 +41,34 @@ export function handlerMove(gs: GameState, ch: ConfirmChannel): (move: ArmyMove)
     };
 }
 
-export function handlerWar(gs: GameState): (rw: RecognitionOfWar) => AckType {
-    return (rw) => {
+export function handlerWar(gs: GameState, ch: ConfirmChannel): (rw: RecognitionOfWar) => Promise<AckType> {
+    return async (rw) => {
         const outcome = handleWar(gs, rw);
         process.stdout.write("> ");
-        switch (outcome.result) {
-            case WarOutcome.NotInvolved:
-                return AckType.NackRequeue;
-            case WarOutcome.NoUnits:
-                return AckType.NackDiscard;
-            case WarOutcome.OpponentWon:
-                return AckType.Ack;
-            case WarOutcome.YouWon:
-                return AckType.Ack;
-            case WarOutcome.Draw:
-                return AckType.Ack;
-            default:
-                console.log("Error: War outcome unclear");
-                return AckType.NackDiscard;
+        try {
+            switch (outcome.result) {
+                case WarOutcome.NotInvolved:
+                    return AckType.NackRequeue;
+                case WarOutcome.NoUnits:
+                    return AckType.NackDiscard;
+                case WarOutcome.OpponentWon:
+                    const oppWonMsg = `${outcome.winner} won a war against ${outcome.loser}`;
+                    await publishGameLog(ch, gs.getUsername(), oppWonMsg);
+                    return AckType.Ack;
+                case WarOutcome.YouWon:
+                    const youWonMsg = `${outcome.winner} won a war against ${outcome.loser}`; // handling this and the above as separate cases for now
+                    await publishGameLog(ch, gs.getUsername(), youWonMsg);
+                    return AckType.Ack;
+                case WarOutcome.Draw:
+                    const nobodyWonMsg = `A war between ${outcome.attacker} and ${outcome.defender} resulted in a draw`;
+                    await publishGameLog(ch, gs.getUsername(), nobodyWonMsg);
+                    return AckType.Ack;
+                default:
+                    console.log("Error: War outcome unclear");
+                    return AckType.NackDiscard;
+            }
+        } catch (err) {
+            return AckType.NackRequeue;
         }
     }
 }

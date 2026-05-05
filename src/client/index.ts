@@ -1,13 +1,13 @@
-import amqp from "amqplib";
+import amqp, { type ConfirmChannel, type Message } from "amqplib";
 import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit } from "../internal/gamelogic/gamelogic.js";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
-import { ArmyMovesPrefix, ExchangePerilDirect, ExchangePerilTopic, PauseKey } from "../internal/routing/routing.js";
+import { ArmyMovesPrefix, ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey } from "../internal/routing/routing.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { commandMove, handleMove } from "../internal/gamelogic/move.js";
+import { commandMove } from "../internal/gamelogic/move.js";
 import { subscribeJSON } from "../internal/pubsub/subscribe.js";
 import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
-import { publishJSON } from "../internal/pubsub/publish.js";
+import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -42,7 +42,7 @@ async function main() {
   const gameState = new GameState(username);
   const pauseHandler = handlerPause(gameState);
   const moveHandler = handlerMove(gameState, ch);
-  const warHandler = handlerWar(gameState);
+  const warHandler = handlerWar(gameState, ch);
 
   await subscribeJSON(conn, ExchangePerilDirect, `${PauseKey}.${username}`, PauseKey, SimpleQueueType.Transient, pauseHandler);
   await subscribeJSON(conn, ExchangePerilTopic, `${ArmyMovesPrefix}.${username}`, `${ArmyMovesPrefix}.*`, SimpleQueueType.Transient, moveHandler);
@@ -88,3 +88,13 @@ main().catch((err) => {
   console.error("Fatal error:", err);
   process.exit(1);
 });
+
+
+export async function publishGameLog(ch: ConfirmChannel, username: string, message: string) {
+  const gameLog = {
+    username: username,
+    message: message,
+    currentTime: new Date(Date.now())
+  };
+  await publishMsgPack(ch, ExchangePerilTopic, `${GameLogSlug}.${username}`, gameLog);
+}
