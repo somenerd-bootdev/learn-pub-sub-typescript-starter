@@ -8,17 +8,17 @@ export async function subscribeJSON<T>(
     queueName: string,
     key: string,
     queueType: SimpleQueueType,
-    handler: (data: T) => AckType,
+    handler: (data: T) => Promise<AckType> | AckType,
 ): Promise<void> {
     const ch = await declareAndBind(conn, exchange, queueName, key, queueType);
     const consumed = await ch[0].consume(ch[1].queue, onMessage); // No nullchecks; we die like men
 
-    function onMessage(msg: ConsumeMessage | null): void {
+    async function onMessage(msg: ConsumeMessage | null): Promise<void> {
         if (msg == null) {
             return;
         }
         const parsedContent = JSON.parse(msg.content.toString());
-        const ackType = handler(parsedContent);
+        const ackType = await handler(parsedContent);
         if (ackType == AckType.Ack) {
             console.log("Acking");
             ch[0].ack(msg);

@@ -6,7 +6,7 @@ import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { commandMove, handleMove } from "../internal/gamelogic/move.js";
 import { subscribeJSON } from "../internal/pubsub/subscribe.js";
-import { handlerMove, handlerPause } from "./handlers.js";
+import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
 
 async function main() {
@@ -37,14 +37,17 @@ async function main() {
     SimpleQueueType.Transient,
   );
 
+  const ch = await conn.createConfirmChannel();
+
   const gameState = new GameState(username);
   const pauseHandler = handlerPause(gameState);
-  const moveHandler = handlerMove(gameState);
+  const moveHandler = handlerMove(gameState, ch);
+  const warHandler = handlerWar(gameState);
 
   await subscribeJSON(conn, ExchangePerilDirect, `${PauseKey}.${username}`, PauseKey, SimpleQueueType.Transient, pauseHandler);
   await subscribeJSON(conn, ExchangePerilTopic, `${ArmyMovesPrefix}.${username}`, `${ArmyMovesPrefix}.*`, SimpleQueueType.Transient, moveHandler);
+  await subscribeJSON(conn, ExchangePerilTopic, "war", "war.*", SimpleQueueType.Durable, warHandler);
 
-  const ch = await conn.createConfirmChannel();
   for (; ;) {
     const input = await getInput("Action: ");
     if (input.length > 0) {

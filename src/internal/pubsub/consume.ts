@@ -18,6 +18,7 @@ export async function declareAndBind(
     durable: queueType === SimpleQueueType.Durable,
     exclusive: queueType !== SimpleQueueType.Durable,
     autoDelete: queueType !== SimpleQueueType.Durable,
+    arguments: { "x-dead-letter-exchange": "peril_dlx" }
   });
 
   await ch.bindQueue(queue.queue, exchange, key);
