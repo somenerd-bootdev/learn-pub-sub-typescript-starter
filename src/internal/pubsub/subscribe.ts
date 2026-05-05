@@ -34,9 +34,10 @@ export async function subscribe<T>(
     handler: (data: T) => Promise<AckType> | AckType,
     deserializer: (data: Buffer) => T,
 ): Promise<void> {
-    const ch = await declareAndBind(conn, exchange, queueName, routingKey, simpleQueueType);
-    await ch[0].prefetch(1);
-    await ch[0].consume(ch[1].queue, onMessage); // No nullchecks; we die like men
+    const [ch, queue] = await declareAndBind(conn, exchange, queueName, routingKey, simpleQueueType);
+    console.log(exchange, queueName, routingKey);
+    await ch.prefetch(10);
+    await ch.consume(queue.queue, onMessage, { noAck: false }); // No nullchecks; we die like men
 
     async function onMessage(msg: ConsumeMessage | null): Promise<void> {
         if (msg == null) {
@@ -46,15 +47,15 @@ export async function subscribe<T>(
         const ackType = await handler(parsedContent);
         if (ackType == AckType.Ack) {
             console.log("Acking");
-            ch[0].ack(msg);
+            ch.ack(msg);
         }
         else if (ackType == AckType.NackRequeue) {
             console.log("Nack requeueing");
-            ch[0].nack(msg, false, true);
+            ch.nack(msg, false, true);
         }
         else {
             console.log("Nack discarding ")
-            ch[0].nack(msg, false, false);
+            ch.nack(msg, false, false);
         }
     }
 }

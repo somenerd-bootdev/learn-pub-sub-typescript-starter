@@ -11,8 +11,6 @@ async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
   const conn = await amqp.connect(rabbitConnString);
   console.log("Peril game server connected to RabbitMQ!");
-  printServerHelp();
-
   subscribeMsgPack(
     conn,
     ExchangePerilTopic,
@@ -25,6 +23,14 @@ async function main() {
       return AckType.Ack;
     }
   );
+
+  // Used to run the server from a non-interactive source, like the multiserver.sh file
+  if (!process.stdin.isTTY) {
+    console.log("Non-interactive mode: skipping command input.");
+    return;
+  }
+  printServerHelp();
+
 
   for (; ;) {
     const input = await getInput("Action: ");
