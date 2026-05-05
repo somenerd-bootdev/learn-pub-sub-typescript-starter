@@ -2,7 +2,10 @@ import amqp from "amqplib";
 import { publishJSON } from "../internal/pubsub/publish.js";
 import { ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey } from "../internal/routing/routing.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
-import { declareAndBind, SimpleQueueType } from "../internal/pubsub/consume.js";
+import { SimpleQueueType } from "../internal/pubsub/consume.js";
+import { subscribeMsgPack } from "../internal/pubsub/subscribe.js";
+import { writeLog, type GameLog } from "../internal/gamelogic/logs.js";
+import { AckType } from "../internal/pubsub/acktype.js";
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -10,12 +13,17 @@ async function main() {
   console.log("Peril game server connected to RabbitMQ!");
   printServerHelp();
 
-  await declareAndBind(
+  subscribeMsgPack(
     conn,
     ExchangePerilTopic,
     GameLogSlug,
     GameLogSlug + ".*",
     SimpleQueueType.Durable,
+    async (gameLog: GameLog) => {
+      await writeLog(gameLog);
+      process.stdout.write("> ");
+      return AckType.Ack;
+    }
   );
 
   for (; ;) {
