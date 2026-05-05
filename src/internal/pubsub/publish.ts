@@ -1,13 +1,26 @@
-import type { ConfirmChannel } from "amqplib";
+import { type ConfirmChannel } from "amqplib";
 
-export async function publishJSON<T>(
+export function publishJSON<T>(
     ch: ConfirmChannel,
     exchange: string,
     routingKey: string,
     value: T,
 ): Promise<void> {
-    const serializedValue = Buffer.from(JSON.stringify(value));
-    ch.publish(exchange, routingKey, serializedValue, {
-        contentType: "application/json"
+    const content = Buffer.from(JSON.stringify(value));
+
+    return new Promise((resolve, reject) => {
+        ch.publish(
+            exchange,
+            routingKey,
+            content,
+            { contentType: "application/json" },
+            (err) => {
+                if (err !== null) {
+                    reject(new Error("Message was NACKed by the broker"));
+                } else {
+                    resolve();
+                }
+            },
+        );
     });
 }
